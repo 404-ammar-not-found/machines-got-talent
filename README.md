@@ -35,8 +35,19 @@
   who already picked) instead of state.DraftOrder[1] (the next player). This caused ErrNotYourTurn
   to fire before ErrAIAlreadyClaimed could be reached.                                             
                                                                                                  
-  How to run                                                                                       
-  
-  cd backend                                                                                       
-  go run ./cmd/server          # starts on :8080                                                 
-  # Python AI service must be running on :8000   
+  How to run
+
+  ### Backend
+  1. cd backend
+  2. go run ./cmd/server          # starts on :8080
+  3. Ensure Python AI service is running on :8000 (see /comedy_agents)
+
+  ### Frontend
+  This project requires the sibling repository `machines-got-talent-frontend`.
+  1. cd ..
+  2. git clone <frontend-repo-url> machines-got-talent-frontend
+  3. cd machines-got-talent-frontend
+  4. npm install
+  5. npm run dev                  # starts on :5173
+
+  Note: Ensure the `.env` in the frontend matches the backend's WebSocket route: `VITE_WS_URL=ws://localhost:8080/ws`

@@ -115,7 +115,7 @@ func (h *Hub) run() {
 }
 
 func main() {
-
+									
 	hub := &Hub{
 		clients:    make(map[*websocket.Conn]Judge),
 		register:   make(chan *websocket.Conn),
