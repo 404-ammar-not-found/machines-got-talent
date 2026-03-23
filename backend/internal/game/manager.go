@@ -15,15 +15,17 @@ var ErrGameNotFound = errors.New("game not found for lobby")
 
 // Manager coordinates the game engine and the WebSocket hub for one lobby.
 type Manager struct {
-	mu    sync.Mutex
-	state *GameState
-	hub   *Hub
+	mu       sync.Mutex
+	state    *GameState
+	hub      *Hub
+	aiClient *ai.Client
 }
 
-func newManager(state *GameState) *Manager {
+func newManager(state *GameState, aiClient *ai.Client) *Manager {
 	m := &Manager{
-		state: state,
-		hub:   newHub(),
+		state:    state,
+		hub:      newHub(),
+		aiClient: aiClient,
 	}
 	m.hub.onMessage = m.handleClientMessage
 	m.hub.onLeave = m.handlePlayerLeft
@@ -39,6 +41,23 @@ type Store struct {
 
 func NewStore() *Store {
 	return &Store{managers: make(map[string]*Manager)}
+}
+
+// GetOrCreate returns the manager for a lobby, creating one (without state) if needed.
+func (s *Store) GetOrCreate(lobbyCode string) *Manager {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	m, ok := s.managers[lobbyCode]
+	if !ok {
+		m = &Manager{
+			hub: newHub(),
+		}
+		m.hub.onMessage = m.handleClientMessage
+		m.hub.onLeave = m.handlePlayerLeft
+		go m.hub.Run()
+		s.managers[lobbyCode] = m
+	}
+	return m
 }
 
 func (s *Store) Get(lobbyCode string) (*Manager, error) {
@@ -63,9 +82,7 @@ func (s *Store) delete(lobbyCode string) {
 	delete(s.managers, lobbyCode)
 }
 
-// StartGame creates a game manager for the lobby, calls the AI service, and
-// broadcasts the game:start event. Callers must ensure the lobby is in the
-// waiting state before calling.
+// StartGame creates or updates a game manager for the lobby.
 func (s *Store) StartGame(l *lobby.Lobby, aiClient *ai.Client) (*Manager, error) {
 	l.RLock()
 	lobbyCode := l.Code
@@ -80,8 +97,12 @@ func (s *Store) StartGame(l *lobby.Lobby, aiClient *ai.Client) (*Manager, error)
 	}
 
 	state := NewGameState(lobbyCode, hostID, players, comedians)
-	m := newManager(state)
-	s.set(lobbyCode, m)
+
+	m := s.GetOrCreate(lobbyCode)
+	m.mu.Lock()
+	m.state = state
+	m.aiClient = aiClient
+	m.mu.Unlock()
 
 	// Broadcast game:start to all connected WebSocket clients.
 	aiList := make([]*AIComedian, 0, len(state.AIComedians))
@@ -105,14 +126,13 @@ func (s *Store) StartGame(l *lobby.Lobby, aiClient *ai.Client) (*Manager, error)
 // ConnectClient upgrades an existing HTTP connection to WebSocket and registers
 // it with the lobby's hub.
 func (s *Store) ConnectClient(lobbyCode string, c *Client) error {
-	m, err := s.Get(lobbyCode)
-	if err != nil {
-		return err
-	}
+	m := s.GetOrCreate(lobbyCode)
 
 	m.mu.Lock()
-	if p, ok := m.state.Players[c.PlayerID]; ok {
-		p.Connected = true
+	if m.state != nil {
+		if p, ok := m.state.Players[c.PlayerID]; ok {
+			p.Connected = true
+		}
 	}
 	m.mu.Unlock()
 
@@ -161,6 +181,11 @@ func (m *Manager) handleClientMessage(c *Client, msg WSMessage) {
 
 func (m *Manager) processDraftPick(c *Client, p DraftPickPayload) {
 	m.mu.Lock()
+	if m.state == nil {
+		m.mu.Unlock()
+		m.sendError(c, "game has not started yet")
+		return
+	}
 	update, err := ProcessDraftPick(m.state, c.PlayerID, p.AIID)
 	m.mu.Unlock()
 
@@ -178,6 +203,11 @@ func (m *Manager) processDraftPick(c *Client, p DraftPickPayload) {
 
 func (m *Manager) processVote(c *Client, p VotePayload) {
 	m.mu.Lock()
+	if m.state == nil {
+		m.mu.Unlock()
+		m.sendError(c, "game has not started yet")
+		return
+	}
 	err := ProcessVote(m.state, c.PlayerID, p.AIID, p.VoteType)
 	allVoted := AllConnectedPlayersVoted(m.state)
 	m.mu.Unlock()
@@ -194,6 +224,11 @@ func (m *Manager) processVote(c *Client, p VotePayload) {
 
 func (m *Manager) processForceEndRound(c *Client) {
 	m.mu.Lock()
+	if m.state == nil {
+		m.mu.Unlock()
+		m.sendError(c, "game has not started yet")
+		return
+	}
 	if m.state.HostID != c.PlayerID {
 		m.mu.Unlock()
 		m.sendError(c, ErrNotHost.Error())
@@ -215,6 +250,42 @@ func (m *Manager) beginRound() {
 		return
 	}
 	m.hub.Broadcast(NewWSMessage(EventGameRoundStart, payload))
+	go m.broadcastJokes(payload.Matchups)
+}
+
+func (m *Manager) broadcastJokes(matchups []Matchup) {
+	// Simple implementation: fetch and broadcast one by one.
+	for _, mup := range matchups {
+		m.mu.Lock()
+		ai1 := m.state.AIComedians[mup.AI1]
+		var ai2 *AIComedian
+		if mup.AI2 != "" {
+			ai2 = m.state.AIComedians[mup.AI2]
+		}
+		m.mu.Unlock()
+
+		// AI1 Joke
+		pers1, joke1, err := m.aiClient.Chat(ai1.ID, "Tell a short comedy joke.")
+		if err == nil {
+			m.hub.Broadcast(NewWSMessage(EventGameJoke, JokePayload{
+				AIID:        ai1.ID,
+				Personality: pers1,
+				Joke:        joke1,
+			}))
+		}
+
+		// AI2 Joke (if not a bye)
+		if ai2 != nil {
+			pers2, joke2, err := m.aiClient.Chat(ai2.ID, "Tell a short comedy joke.")
+			if err == nil {
+				m.hub.Broadcast(NewWSMessage(EventGameJoke, JokePayload{
+					AIID:        ai2.ID,
+					Personality: pers2,
+					Joke:        joke2,
+				}))
+			}
+		}
+	}
 }
 
 // endRound resolves the current round, eliminates losers, and either starts
@@ -296,7 +367,7 @@ func snapshotPlayers(l *lobby.Lobby) map[string]*PlayerState {
 	return out
 }
 
-// totalRoundsEstimate returns ceil(log2(n)) — used as a denominator for rewards.
+// totalRoundsEstimate returns ceil(log2(n)) â€” used as a denominator for rewards.
 // Exported so handler can use it without duplicating logic.
 func totalRoundsEstimate(n int) int {
 	if n <= 1 {

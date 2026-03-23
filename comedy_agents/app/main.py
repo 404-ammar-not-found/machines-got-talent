@@ -10,11 +10,11 @@ agents_registry = {}
 
 @app.post("/create_agents")
 def create_agents_endpoint(request: CreateAgentsRequest):
-    global agents_registry
-    agents_registry = create_agents(request.n)
+    new_agents = create_agents(request.n)
+    agents_registry.update(new_agents)
     return {
-        "message": f"{len(agents_registry)} agents created.",
-        "agents": list(agents_registry.keys())
+        "message": f"{len(new_agents)} agents created.",
+        "agents": list(new_agents.keys())
     }
 
 

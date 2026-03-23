@@ -85,7 +85,9 @@ const (
 	EventGameForceEndRound = "game:force_end_round"
 	EventGameRoundResult   = "game:round_result"
 	EventGameEnd           = "game:end"
+	EventGameJoke          = "game:joke"
 	EventError             = "error"
+
 )
 
 // WSMessage is the envelope for every WebSocket message.
@@ -149,12 +151,19 @@ type RoundStartPayload struct {
 }
 
 type RoundResultPayload struct {
-	Round     int               `json:"round"`
-	Eliminated []string         `json:"eliminated"`
-	Scores    map[string]int    `json:"scores"`
+	Round      int            `json:"round"`
+	Eliminated []string       `json:"eliminated"`
+	Scores     map[string]int `json:"scores"`
+}
+
+type JokePayload struct {
+	AIID        string `json:"ai_id"`
+	Personality string `json:"personality"`
+	Joke        string `json:"joke"`
 }
 
 type GameEndPayload struct {
+
 	WinnerAI     string         `json:"winner_ai"`
 	WinnerPlayer string         `json:"winner_player"`
 	TokenDeltas  map[string]int `json:"token_deltas"`

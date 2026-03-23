@@ -16,11 +16,9 @@ import (
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
-	// Allow all origins in development; tighten for production.
 	CheckOrigin: func(r *http.Request) bool { return true },
 }
 
-// Handler handles HTTP and WebSocket game endpoints.
 type Handler struct {
 	gameStore  *Store
 	lobbySvc   *lobby.Service
@@ -31,17 +29,12 @@ func NewHandler(gs *Store, ls *lobby.Service, ac *ai.Client) *Handler {
 	return &Handler{gameStore: gs, lobbySvc: ls, aiClient: ac}
 }
 
-// RegisterRoutes mounts game endpoints.
 func (h *Handler) RegisterRoutes(protected *gin.RouterGroup, public *gin.RouterGroup) {
 	protected.POST("/start", h.StartGame)
 	protected.POST("/use-advantage", h.UseAdvantage)
-	// WebSocket auth is done via query param — see ServeWS.
 	public.GET("/ws/:lobbyCode", h.ServeWS)
 }
 
-// StartGame — POST /game/start — host starts the game for their lobby.
-//
-// Request body: { "lobby_code": "abc123" }
 func (h *Handler) StartGame(c *gin.Context) {
 	var req struct {
 		LobbyCode string `json:"lobby_code" binding:"required"`
@@ -78,7 +71,6 @@ func (h *Handler) StartGame(c *gin.Context) {
 	}
 
 	if _, err := h.gameStore.StartGame(l, h.aiClient); err != nil {
-		// Roll back lobby state on failure.
 		h.lobbySvc.SetGameState(callerID, req.LobbyCode, lobby.GameStateWaiting)
 		c.JSON(http.StatusBadGateway, gin.H{"error": "failed to create AI comedians: " + err.Error()})
 		return
@@ -87,9 +79,6 @@ func (h *Handler) StartGame(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "game started", "lobby_code": req.LobbyCode})
 }
 
-// UseAdvantage — POST /game/use-advantage — purchases a game advantage using tokens.
-//
-// Request body: { "lobby_code": "abc123", "advantage": "first_pick", "token_balance": 200 }
 func (h *Handler) UseAdvantage(c *gin.Context) {
 	var req struct {
 		LobbyCode    string `json:"lobby_code"    binding:"required"`
@@ -102,8 +91,6 @@ func (h *Handler) UseAdvantage(c *gin.Context) {
 	}
 
 	playerID := auth.GetUserID(c)
-
-	// First, update the token balance from the request (frontend is source of truth).
 	l, err := h.lobbySvc.GetLobby(req.LobbyCode)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
@@ -126,11 +113,7 @@ func (h *Handler) UseAdvantage(c *gin.Context) {
 	case "first_pick":
 		delta, err := h.lobbySvc.ApplyFirstPickAdvantage(playerID, req.LobbyCode, config.FirstPickCost)
 		if err != nil {
-			if errors.Is(err, lobby.ErrNotInLobby) {
-				c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
-			} else {
-				c.JSON(http.StatusPaymentRequired, gin.H{"error": err.Error()})
-			}
+			c.JSON(http.StatusPaymentRequired, gin.H{"error": err.Error()})
 			return
 		}
 		l.RLock()
@@ -141,20 +124,15 @@ func (h *Handler) UseAdvantage(c *gin.Context) {
 			"delta":       delta,
 			"new_balance": newBalance,
 		})
-
 	default:
-		c.JSON(http.StatusBadRequest, gin.H{"error": "unknown advantage type: " + req.Advantage})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "unknown advantage type"})
 	}
 }
 
-// ServeWS — GET /ws/:lobbyCode?token=JWT — upgrades to WebSocket.
 func (h *Handler) ServeWS(c *gin.Context) {
 	lobbyCode := c.Param("lobbyCode")
-
-	// Authenticate via query param (WebSocket clients cannot send custom headers).
 	tokenStr := c.Query("token")
 	if tokenStr == "" {
-		// Also accept Bearer in the Sec-WebSocket-Protocol header as a fallback.
 		tokenStr = strings.TrimPrefix(c.GetHeader("Sec-WebSocket-Protocol"), "Bearer ")
 	}
 	if tokenStr == "" {
@@ -168,7 +146,6 @@ func (h *Handler) ServeWS(c *gin.Context) {
 		return
 	}
 
-	// Ensure the player is in the lobby.
 	l, err := h.lobbySvc.GetLobby(lobbyCode)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "lobby not found"})
@@ -184,11 +161,14 @@ func (h *Handler) ServeWS(c *gin.Context) {
 
 	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
-		// upgrader already wrote the error response.
 		return
 	}
 
+	// GET THE HUB FROM THE MANAGER
+	m := h.gameStore.GetOrCreate(lobbyCode)
+
 	client := &Client{
+		hub:       m.hub,
 		conn:      conn,
 		send:      make(chan WSMessage, 64),
 		PlayerID:  claims.UserID,
@@ -197,12 +177,8 @@ func (h *Handler) ServeWS(c *gin.Context) {
 	}
 
 	if err := h.gameStore.ConnectClient(lobbyCode, client); err != nil {
-		// Game may not have started yet — still allow connection (hub will be
-		// created when the game starts). For pre-game connections we create a
-		// lightweight hub directly on the lobby.
-		conn.WriteJSON(NewWSMessage(EventError, map[string]string{
-			"message": "game not started yet; connect again after host starts the game",
-		}))
+		conn.WriteJSON(NewWSMessage(EventError, map[string]string{"message": err.Error()}))
 		conn.Close()
+		return
 	}
 }
