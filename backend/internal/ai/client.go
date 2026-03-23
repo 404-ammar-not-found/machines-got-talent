@@ -14,7 +14,11 @@ import (
 // Comedian is the Go representation of one AI comedian agent.
 type Comedian struct {
 	ID          string `json:"id"`
+	Name        string `json:"name,omitempty"`
 	Personality string `json:"personality,omitempty"`
+	Streak      int    `json:"streak"`
+	Bio         string `json:"bio"`
+	Color       string `json:"color"`
 }
 
 // Client talks to the Python AI agent service.
@@ -46,17 +50,13 @@ func (c *Client) CreateAgents(n int) ([]Comedian, error) {
 	}
 
 	var result struct {
-		Agents []string `json:"agents"`
+		Agents []Comedian `json:"agents"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, fmt.Errorf("ai service decode error: %w", err)
 	}
 
-	comedians := make([]Comedian, len(result.Agents))
-	for i, id := range result.Agents {
-		comedians[i] = Comedian{ID: id}
-	}
-	return comedians, nil
+	return result.Agents, nil
 }
 
 // Chat sends a message to a specific comedian and returns their reply.

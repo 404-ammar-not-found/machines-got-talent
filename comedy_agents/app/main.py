@@ -14,7 +14,17 @@ def create_agents_endpoint(request: CreateAgentsRequest):
     agents_registry.update(new_agents)
     return {
         "message": f"{len(new_agents)} agents created.",
-        "agents": list(new_agents.keys())
+        "agents": [
+            {
+                "id": agent.id, 
+                "name": agent.name, 
+                "personality": agent.personality,
+                "streak": agent.streak,
+                "bio": agent.bio,
+                "color": agent.color
+            }
+            for agent in new_agents.values()
+        ]
     }
 
 

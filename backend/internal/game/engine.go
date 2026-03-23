@@ -30,7 +30,11 @@ func NewGameState(lobbyCode, hostID string, players map[string]*PlayerState, com
 	for _, c := range comedians {
 		aiMap[c.ID] = &AIComedian{
 			ID:          c.ID,
+			Name:        c.Name,
 			Personality: c.Personality,
+			Streak:      c.Streak,
+			Bio:         c.Bio,
+			Color:       c.Color,
 			Score:       config.AIStartingScore,
 			Alive:       true,
 		}

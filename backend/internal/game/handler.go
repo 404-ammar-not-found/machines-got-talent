@@ -1,7 +1,6 @@
 package game
 
 import (
-	"errors"
 	"net/http"
 	"strings"
 

@@ -26,7 +26,11 @@ const (
 // AIComedian represents one AI agent competing in the tournament.
 type AIComedian struct {
 	ID          string `json:"id"`
+	Name        string `json:"name"`
 	Personality string `json:"personality"`
+	Streak      int    `json:"streak"`
+	Bio         string `json:"bio"`
+	Color       string `json:"color"`
 	Score       int    `json:"score"`
 	Alive       bool   `json:"alive"`
 	ElimRound   int    `json:"elim_round"` // round they were eliminated; 0 = still alive / winner

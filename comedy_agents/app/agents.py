@@ -27,17 +27,28 @@ COMEDIC_PERSONALITIES = [
     "socially awkward robot trying to blend in"
 ]
 
+COMEDIC_NAMES = [
+    "GiggleByte", "LaughTrack-3000", "The Roast Master", "Circuit Joker", "Data Pun",
+    "Comedy Console", "The Silly Silicon", "Punny Processor", "Binary Wit", "Algorithmic Antics",
+    "Logic Laughs", "The Byte-Sized Comic", "ChatterBot Prime", "Mainframe Mirth", "System Chuckles",
+    "The Viral Variety", "Electric Entertainer", "Digital Deadpan", "The Neon Narrator", "Synth Satire"
+]
+
 class ComedyAgent:
-    def __init__(self, personality: str):
+    def __init__(self, name: str, personality: str):
         self.id = str(uuid.uuid4())
+        self.name = name
         self.personality = personality
+        self.streak = random.randint(0, 5)
+        self.color = random.choice(["#6c5ce7", "#e84393", "#00b894", "#fdcb6e", "#e17055", "#00cec9"])
+        self.bio = f"A {personality} specialist. {name} has a reputation for sharp timing and unique comedic angles."
         self.client = GeminiClient()
 
     def respond(self, user_input: str) -> str:
         prompt = f"""
         You are a comedic AI agent.
-        Your personality style: {self.personality}.
-        Respond to the following input in that style:
+        Your name is {self.name} and your style is {self.personality}.
+        Respond to the following input as {self.name} in that style:
 
         User: {user_input}
         """
@@ -45,13 +56,16 @@ class ComedyAgent:
 
 
 def create_agents(n: int):
-    # If n > len(personalities), we'll cycle through them.
-    selected_personalities = []
-    available = list(COMEDIC_PERSONALITIES)
-    random.shuffle(available)
+    # Select n unique names and personalities.
+    available_names = list(COMEDIC_NAMES)
+    available_styles = list(COMEDIC_PERSONALITIES)
+    random.shuffle(available_names)
+    random.shuffle(available_styles)
 
+    agents = []
     for i in range(n):
-        selected_personalities.append(available[i % len(available)])
+        name = available_names[i % len(available_names)]
+        style = available_styles[i % len(available_styles)]
+        agents.append(ComedyAgent(name, style))
 
-    agents = [ComedyAgent(p) for p in selected_personalities]
     return {agent.id: agent for agent in agents}

@@ -146,6 +146,39 @@ func (s *Store) ConnectClient(lobbyCode string, c *Client) error {
 
 	go c.WritePump()
 	go c.ReadPump()
+
+	// If game already started, send current state to this client immediately.
+	m.mu.Lock()
+	if m.state != nil {
+		aiList := make([]*AIComedian, 0, len(m.state.AIComedians))
+		for _, ai := range m.state.AIComedians {
+			aiList = append(aiList, ai)
+		}
+		nextPicker := ""
+		if m.state.DraftIndex < len(m.state.DraftOrder) {
+			nextPicker = m.state.DraftOrder[m.state.DraftIndex]
+		}
+		
+		// Map internal picks to payload format
+		picks := make(map[string]string)
+		for id, p := range m.state.Players {
+			if p.ClaimedAI != "" {
+				picks[id] = p.ClaimedAI
+			}
+		}
+
+		c.send <- NewWSMessage(EventGameStart, map[string]interface{}{
+			"ai_comedians": aiList,
+			"draft_order":  m.state.DraftOrder,
+			"next_picker":  nextPicker,
+			"picks":        picks,
+			"phase":        m.state.Phase,
+			"round":        m.state.Round,
+			"matchups":     m.state.Matchups,
+		})
+	}
+	m.mu.Unlock()
+
 	return nil
 }
 
