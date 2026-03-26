@@ -1,4 +1,4 @@
-import mysql.connector, jwt
+import mysql.connector, jwt, os
 
 """
 Prompts Table
@@ -54,7 +54,12 @@ def connect():
 	The connection is closed at the end of every function
 	"""
 	try:
-		db = mysql.connector.connect(host = "localhost", port = "3307", user = "root", password = "pass", database = "mgt_db")
+		os.dotenv.load_env()
+		remote_host = os.getenv("HOST")
+		remote_db = os.getenv("DB")
+		remote_user = os.getenv("USER")
+		remote_pass = os.getenv("DB_PASS")
+		db = mysql.connect(host = host, database = database, user = user, password = password)
 		cursor = db.cursor()
 	except:
 		raise ConnectionError("There was a problem connecting to the database")
