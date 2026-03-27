@@ -1,9 +1,14 @@
 # app/database.py
+import os
 import mysql.connector
 import jwt
-import os
-from dotenv import load_dotenv
 from app.config import settings
+
+# NOTE: Credentials for the REMOTE database NOT LOCAL (in .env)
+DB_HOST = os.getenv("DB_HOST")
+DB_USER = os.getenv("DB_USER")
+DB_PASS = os.getenv("DB_PASS")
+DB_NAME = os.getenv("DB_NAME")
 
 """
 Prompts Table
@@ -55,17 +60,16 @@ def getUserDetails(token, key):
 def connect():
     """
     Starts a connection with the database
-    Outputs the database connection with the remote database and also outputs a cursor to perform sql on the remote database
-    The connection is closed at the end of every function
+    Outputs the database and a cursor to communicate with the database
     """
     try:
-        load_dotenv()
-        remote_host = os.getenv("HOST")
-        remote_db = os.getenv("DB")
-        remote_user = os.getenv("USER")
-        remote_pass = os.getenv("DB_PASS")
-        db = mysql.connector.connect(host = remote_host, database = remote_db, user = remote_user, password = remote_pass)
-        cursor = db.cursor(dictionary = True) # Use dictionary = True for easier access
+        db = mysql.connector.connect(
+            host = DB_HOST,
+            user = DB_USER,
+            password = DB_PASS,
+            database = DB_NAME,
+        )
+        cursor = db.cursor(dictionary = True) # Use dictionary=True for easier access
         return db, cursor
     except Exception as e:
         raise ConnectionError(f"There was a problem connecting to the database: {e}")
