@@ -44,17 +44,23 @@
      python setup_db.py
      ```
      This will create the `mgt_db` database, the `users` and `prompts` tables, and seed initial failsafe jokes.
+  3. If your local MySQL is not using the defaults above, override them with environment variables:
+     ```bash
+     MGT_DB_HOST=127.0.0.1 MGT_DB_PORT=3307 MGT_DB_USER=root MGT_DB_PASSWORD='' MGT_DB_NAME=mgt_db python setup_db.py
+     ```
 
   ### Backend
   1. cd backend
   2. go get github.com/go-sql-driver/mysql  # if not already installed
   3. go run ./cmd/server          # starts on :8080
   4. Ensure Python AI service is running on :8000 (see /comedy_agents)
+  5. The backend also honors `MGT_DB_HOST`, `MGT_DB_PORT`, `MGT_DB_USER`, `MGT_DB_PASSWORD`, and `MGT_DB_NAME`.
 
   ### AI Service (Python)
   1. cd comedy_agents
   2. pip install -r requirements.txt
   3. python run.py                # starts on :8000
+  4. The AI service uses the same `MGT_DB_*` environment variables for its failsafe prompt database.
 
   ### Frontend
   This project requires the sibling repository `machines-got-talent-frontend`.

@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"os"
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
@@ -11,11 +12,23 @@ import (
 
 var DB *sql.DB
 
+func envOrDefault(key, fallback string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return fallback
+}
+
 // InitDB initializes the connection to mgt_db
 func InitDB() {
-	// Root (no password), Port: 3306, DB: mgt_db
-	dsn := "root:@tcp(localhost:3306)/mgt_db?parseTime=true"
-	
+	host := envOrDefault("MGT_DB_HOST", "localhost")
+	port := envOrDefault("MGT_DB_PORT", "3306")
+	user := envOrDefault("MGT_DB_USER", "root")
+	password := os.Getenv("MGT_DB_PASSWORD")
+	name := envOrDefault("MGT_DB_NAME", "mgt_db")
+
+	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=true", user, password, host, port, name)
+
 	var err error
 	DB, err = sql.Open("mysql", dsn)
 	if err != nil {
@@ -29,8 +42,8 @@ func InitDB() {
 
 	// Check connection
 	if err := DB.Ping(); err != nil {
-		log.Printf("Warning: Could not connect to MySQL on port 3306. Is the database running? Error: %v", err)
+		log.Printf("Warning: Could not connect to MySQL at %s:%s/%s. Is the database running? Error: %v", host, port, name, err)
 	} else {
-		fmt.Println("Successfully connected to MySQL (mgt_db) on port 3306")
+		fmt.Printf("Successfully connected to MySQL (%s) at %s:%s\n", name, host, port)
 	}
 }

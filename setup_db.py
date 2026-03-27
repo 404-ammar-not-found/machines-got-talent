@@ -1,5 +1,13 @@
+import os
 import mysql.connector
 import sys
+
+
+DB_HOST = os.getenv("MGT_DB_HOST", "localhost")
+DB_USER = os.getenv("MGT_DB_USER", "root")
+DB_PASSWORD = os.getenv("MGT_DB_PASSWORD", "")
+DB_PORT = int(os.getenv("MGT_DB_PORT", "3306"))
+DB_NAME = os.getenv("MGT_DB_NAME", "mgt_db")
 
 def setup():
     print("--- Machines Got Talent: Database Setup ---")
@@ -7,17 +15,17 @@ def setup():
         # 1. Initial connection to MySQL (without selecting a DB)
         # XAMPP Defaults: Host=localhost, User=root, Password="", Port=3306
         db = mysql.connector.connect(
-            host="localhost",
-            user="root",
-            password="",
-            port="3306"
+            host=DB_HOST,
+            user=DB_USER,
+            password=DB_PASSWORD,
+            port=DB_PORT,
         )
         cursor = db.cursor()
 
         # 2. Create the main database
-        print("[1/4] Creating database 'mgt_db'...")
-        cursor.execute("CREATE DATABASE IF NOT EXISTS mgt_db")
-        cursor.execute("USE mgt_db")
+        print(f"[1/4] Creating database '{DB_NAME}'...")
+        cursor.execute(f"CREATE DATABASE IF NOT EXISTS `{DB_NAME}`")
+        cursor.execute(f"USE `{DB_NAME}`")
 
         # 3. Create the 'prompts' table (for AI failsafe jokes)
         print("[2/4] Creating 'prompts' table...")
@@ -64,14 +72,14 @@ def setup():
         db.commit()
         cursor.close()
         db.close()
-        print("\nSUCCESS: Database 'mgt_db' is fully configured and ready for use!")
+        print(f"\nSUCCESS: Database '{DB_NAME}' is fully configured and ready for use!")
 
     except mysql.connector.Error as err:
         print(f"\nCRITICAL ERROR: {err}")
         print("\nTROUBLESHOOTING:")
-        print("1. Ensure XAMPP is open and the MySQL module is 'Running'.")
-        print("2. Ensure MySQL is using Port 3306 (the default).")
-        print("3. Ensure the 'root' user has no password (the default).")
+        print("1. Ensure your MySQL server is running.")
+        print(f"2. Confirm the connection settings are correct: host={DB_HOST} port={DB_PORT} user={DB_USER} db={DB_NAME}.")
+        print("3. Set MGT_DB_HOST / MGT_DB_PORT / MGT_DB_USER / MGT_DB_PASSWORD / MGT_DB_NAME if you are not using the README defaults.")
         sys.exit(1)
 
 if __name__ == "__main__":

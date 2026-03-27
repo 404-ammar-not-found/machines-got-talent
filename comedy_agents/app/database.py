@@ -1,7 +1,15 @@
 # app/database.py
+import os
 import mysql.connector
 import jwt
 from app.config import settings
+
+
+DB_HOST = os.getenv("MGT_DB_HOST", "localhost")
+DB_PORT = int(os.getenv("MGT_DB_PORT", "3306"))
+DB_USER = os.getenv("MGT_DB_USER", "root")
+DB_PASSWORD = os.getenv("MGT_DB_PASSWORD", "")
+DB_NAME = os.getenv("MGT_DB_NAME", "mgt_db")
 
 """
 Prompts Table
@@ -57,11 +65,11 @@ def connect():
     """
     try:
         db = mysql.connector.connect(
-            host="localhost", 
-            port="3306", 
-            user="root", 
-            password="", 
-            database="mgt_db"
+            host=DB_HOST,
+            port=DB_PORT,
+            user=DB_USER,
+            password=DB_PASSWORD,
+            database=DB_NAME,
         )
         cursor = db.cursor(dictionary=True) # Use dictionary=True for easier access
         return db, cursor
