@@ -2,7 +2,6 @@
 import os
 import mysql.connector
 import jwt
-from app.config import settings
 
 # NOTE: Credentials for the REMOTE database NOT LOCAL (in .env)
 DB_HOST = os.getenv("DB_HOST")
@@ -67,7 +66,7 @@ def connect():
             host = DB_HOST,
             user = DB_USER,
             password = DB_PASS,
-            database = DB_NAME,
+            database = DB_NAME
         )
         cursor = db.cursor(dictionary = True) # Use dictionary=True for easier access
         return db, cursor
