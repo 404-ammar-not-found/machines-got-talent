@@ -2,8 +2,10 @@
 import os
 import mysql.connector
 import jwt
+from dotenv import load_dotenv
 
 # NOTE: Credentials for the REMOTE database NOT LOCAL (in .env)
+load_dotenv()
 DB_HOST = os.getenv("DB_HOST")
 DB_USER = os.getenv("DB_USER")
 DB_PASS = os.getenv("DB_PASS")
