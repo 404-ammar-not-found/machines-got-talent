@@ -1,34 +1,30 @@
 import os
 import mysql.connector
 import sys
+from dotenv import load_dotenv
 
-
-DB_HOST = os.getenv("MGT_DB_HOST", "localhost")
-DB_USER = os.getenv("MGT_DB_USER", "root")
-DB_PASSWORD = os.getenv("MGT_DB_PASSWORD", "")
-DB_PORT = int(os.getenv("MGT_DB_PORT", "3306"))
-DB_NAME = os.getenv("MGT_DB_NAME", "mgt_db")
+# Gets REMOTE server credentials NOT LOCAL
+load_dotenv()
+DB_HOST = os.getenv("DB_HOST")
+DB_NAME = os.getenv("DB_NAME")
+DB_USER = os.getenv("DB_USER")
+DB_PASSWORD = os.getenv("DB_PASS")
 
 def setup():
     print("--- Machines Got Talent: Database Setup ---")
     try:
-        # 1. Initial connection to MySQL (without selecting a DB)
-        # XAMPP Defaults: Host=localhost, User=root, Password="", Port=3306
+        # 1. Initial connection to MySQL DB
+        # Uses remote server credentials
         db = mysql.connector.connect(
-            host=DB_HOST,
-            user=DB_USER,
-            password=DB_PASSWORD,
-            port=DB_PORT,
+            host = DB_HOST,
+            user = DB_USER,
+            password = DB_PASSWORD,
+            database = DB_NAME
         )
         cursor = db.cursor()
 
-        # 2. Create the main database
-        print(f"[1/4] Creating database '{DB_NAME}'...")
-        cursor.execute(f"CREATE DATABASE IF NOT EXISTS `{DB_NAME}`")
-        cursor.execute(f"USE `{DB_NAME}`")
-
-        # 3. Create the 'prompts' table (for AI failsafe jokes)
-        print("[2/4] Creating 'prompts' table...")
+        # 2. Create the 'prompts' table (for AI failsafe jokes)
+        print("[1/3] Creating 'prompts' table...")
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS prompts (
                 id INT AUTO_INCREMENT PRIMARY KEY,
@@ -36,8 +32,8 @@ def setup():
             )
         """)
 
-        # 4. Create the 'users' table (for persistent stats/economy)
-        print("[3/4] Creating 'users' table...")
+        # 3. Create the 'users' table (for persistent stats/economy)
+        print("[2/3] Creating 'users' table...")
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS users (
                 id VARCHAR(255) PRIMARY KEY,
@@ -49,8 +45,8 @@ def setup():
             )
         """)
 
-        # 5. Seed initial "Failsafe" prompts
-        print("[4/4] Seeding starter prompts...")
+        # 4. Seed initial "Failsafe" prompts
+        print("[3/3] Seeding starter prompts...")
         starter_prompts = [
             ("Why did the AI cross the road? To optimize the path to the other side!"),
             ("A robot walks into a bar... and asks for a byte."),
@@ -76,10 +72,7 @@ def setup():
 
     except mysql.connector.Error as err:
         print(f"\nCRITICAL ERROR: {err}")
-        print("\nTROUBLESHOOTING:")
-        print("1. Ensure your MySQL server is running.")
-        print(f"2. Confirm the connection settings are correct: host={DB_HOST} port={DB_PORT} user={DB_USER} db={DB_NAME}.")
-        print("3. Set MGT_DB_HOST / MGT_DB_PORT / MGT_DB_USER / MGT_DB_PASSWORD / MGT_DB_NAME if you are not using the README defaults.")
+        print(f"\nContact Tyler to make sure the credentials are correct")
         sys.exit(1)
 
 if __name__ == "__main__":
