@@ -1,4 +1,5 @@
 import mysql.connector, jwt, os
+from dotenv import load_dotenv
 
 """
 Prompts Table
@@ -54,12 +55,12 @@ def connect():
 	The connection is closed at the end of every function
 	"""
 	try:
-		os.dotenv.load_env()
+		load_dotenv()
 		remote_host = os.getenv("HOST")
 		remote_db = os.getenv("DB")
 		remote_user = os.getenv("USER")
 		remote_pass = os.getenv("DB_PASS")
-		db = mysql.connect(host = host, database = database, user = user, password = password)
+		db = mysql.connector.connect(host = remote_host, database = remote_db, user = remote_user, password = remote_pass)
 		cursor = db.cursor()
 	except:
 		raise ConnectionError("There was a problem connecting to the database")
@@ -75,8 +76,7 @@ def addPrompt(new_prompt):
 		db, cursor = connect()
 		try:
 			sql = "INSERT INTO prompts (prompt) VALUES (%s)"
-			val = (new_prompt)
-			cursor.execute(sql, val)
+			cursor.execute(sql, (new_prompt,))
 			db.commit()
 			cursor.close()
 			db.close()
@@ -112,9 +112,8 @@ def searchPrompt(attribute, value):
 	"""
 	db, cursor = connect()
 	try:
-		sql = "SELECT * FROM prompts WHERE " + attribute + " = %s"
-		val = (value)
-		cursor.execute(sql, val)
+		sql = f"SELECT * FROM prompts WHERE {attribute} = (%s)"
+		cursor.execute(sql, (value,))
 		result = cursor.fetchone()
 		cursor.close()
 		db.close()
@@ -133,9 +132,8 @@ def removePrompt(attribute, value):
 	"""
 	db, cursor = connect()
 	try:
-		sql = "DELETE FROM prompts WHERE " + attribute	+ " = (%s)"
-		val = (value)
-		cursor.execute(sql, val)
+		sql = f"DELETE FROM prompts WHERE {attribute} = (%s)"
+		cursor.execute(sql, (value,))
 		db.commit()
 		cursor.close()
 		db.close()
@@ -155,8 +153,7 @@ def updatePrompt(prompt_id, new_prompt):
 	else:
 		try:
 			sql = "UPDATE prompts SET prompt = (%s) WHERE id = (%s)"
-			val = (new_prompt, prompt_id)
-			cursor.execute(sql, val)
+			cursor.execute(sql, (new_prompt, prompt_id))
 			db.commit()
 			cursor.close()
 			db.close()
@@ -176,8 +173,7 @@ def addUser(token, key):
 	if not searchUserWithoutToken("username", payload_username):
 		try:
 			sql = "INSERT INTO users (username, email, win_count, balance) VALUES (%s, %s, %s, %s)"
-			val = (payload_username, payload_email, 0, 0)
-			cursor.execute(sql, val)
+			cursor.execute(sql, (payload_username, payload_email, 0, 0))
 			db.commit()
 			cursor.close()
 			db.close()
@@ -221,9 +217,8 @@ def searchUserWithoutToken(attribute, value):
 	"""
 	db, cursor = connect()
 	try:
-		sql = "SELECT * FROM users WHERE " + attribute + " = %s"
-		val = (value)
-		cursor.execute(sql, val)
+		sql = f"SELECT * FROM users WHERE {attribute} = (%s)"
+		cursor.execute(sql, (value,))
 		result = cursor.fetchone()
 		cursor.close()
 		db.close()
@@ -241,9 +236,8 @@ def removeUser(attribute, value):
 	"""
 	db, cursor = connect()
 	try:
-		sql = "DELETE FROM users WHERE " + attribute + " = (%s)"
-		val = (value)
-		cursor.execute(sql, val)
+		sql = f"DELETE FROM users WHERE {attribute} = (%s)"
+		cursor.execute(sql, (value,))
 		db.commit()
 		cursor.close()
 		db.close()
@@ -263,9 +257,8 @@ def updateUser(username, attribute, value):
 		raise AccessError("This user account does not exist")
 	else:
 		try:
-			sql = "UPDATE users SET " + attribute + " = (%s) WHERE username = (%s)"
-			val = (value, username)
-			cursor.execute(sql, val)
+			sql = f"UPDATE users SET {attribute} = (%s) WHERE username = (%s)"
+			cursor.execute(sql, (value, username))
 			db.commit()
 			cursor.close()
 			db.close()
