@@ -37,10 +37,24 @@
                                                                                                  
   How to run
 
+  ### Database Setup
+  1. Ensure XAMPP (or another MySQL server) is running on port 3306.
+  2. Run the automated setup script from the root directory:
+     ```bash
+     python setup_db.py
+     ```
+     This will create the `mgt_db` database, the `users` and `prompts` tables, and seed initial failsafe jokes.
+
   ### Backend
   1. cd backend
-  2. go run ./cmd/server          # starts on :8080
-  3. Ensure Python AI service is running on :8000 (see /comedy_agents)
+  2. go get github.com/go-sql-driver/mysql  # if not already installed
+  3. go run ./cmd/server          # starts on :8080
+  4. Ensure Python AI service is running on :8000 (see /comedy_agents)
+
+  ### AI Service (Python)
+  1. cd comedy_agents
+  2. pip install -r requirements.txt
+  3. python run.py                # starts on :8000
 
   ### Frontend
   This project requires the sibling repository `machines-got-talent-frontend`.
