@@ -1,12 +1,13 @@
 package auth
 
 import (
+	"database/sql"
 	"errors"
-	"sync"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
+	"github.com/machines-got-talent/backend/internal/db"
 	"github.com/machines-got-talent/backend/pkg/config"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -18,46 +19,57 @@ var (
 	ErrUsernameTaken   = errors.New("username already taken")
 )
 
-// Service holds an in-memory user store and provides auth business logic.
+// Service provides auth business logic via MySQL.
 type Service struct {
-	mu      sync.RWMutex
-	byEmail map[string]*User
-	byID    map[string]*User
 }
 
 func NewService() *Service {
-	return &Service{
-		byEmail: make(map[string]*User),
-		byID:    make(map[string]*User),
-	}
+	return &Service{}
 }
 
 func (s *Service) Register(req RegisterRequest) (*AuthResponse, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	if _, exists := s.byEmail[req.Email]; exists {
+	// 1. Check if email exists
+	var existingID string
+	err := db.DB.QueryRow("SELECT id FROM users WHERE email = ?", req.Email).Scan(&existingID)
+	if err != nil && err != sql.ErrNoRows {
+		return nil, err
+	}
+	if err == nil {
 		return nil, ErrEmailTaken
 	}
-	for _, u := range s.byEmail {
-		if u.Username == req.Username {
-			return nil, ErrUsernameTaken
-		}
+
+	// 2. Check if username exists
+	err = db.DB.QueryRow("SELECT id FROM users WHERE username = ?", req.Username).Scan(&existingID)
+	if err != nil && err != sql.ErrNoRows {
+		return nil, err
+	}
+	if err == nil {
+		return nil, ErrUsernameTaken
 	}
 
+	// 3. Hash password
 	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
 		return nil, err
 	}
 
+	// 4. Create user
 	user := &User{
 		ID:           uuid.NewString(),
 		Username:     req.Username,
 		Email:        req.Email,
 		PasswordHash: string(hash),
+		WinCount:     0,
+		Balance:      0,
 	}
-	s.byEmail[req.Email] = user
-	s.byID[user.ID] = user
+
+	_, err = db.DB.Exec(
+		"INSERT INTO users (id, username, email, password_hash, win_count, balance) VALUES (?, ?, ?, ?, ?, ?)",
+		user.ID, user.Username, user.Email, user.PasswordHash, user.WinCount, user.Balance,
+	)
+	if err != nil {
+		return nil, err
+	}
 
 	token, err := generateJWT(user)
 	if err != nil {
@@ -67,32 +79,56 @@ func (s *Service) Register(req RegisterRequest) (*AuthResponse, error) {
 }
 
 func (s *Service) Login(req LoginRequest) (*AuthResponse, error) {
-	s.mu.RLock()
-	user, exists := s.byEmail[req.Email]
-	s.mu.RUnlock()
+	var user User
+	err := db.DB.QueryRow(
+		"SELECT id, username, email, password_hash, win_count, balance FROM users WHERE email = ?",
+		req.Email,
+	).Scan(&user.ID, &user.Username, &user.Email, &user.PasswordHash, &user.WinCount, &user.Balance)
 
-	if !exists {
+	if err == sql.ErrNoRows {
 		return nil, ErrUserNotFound
 	}
+	if err != nil {
+		return nil, err
+	}
+
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
 		return nil, ErrInvalidPassword
 	}
 
-	token, err := generateJWT(user)
+	token, err := generateJWT(&user)
 	if err != nil {
 		return nil, err
 	}
-	return &AuthResponse{Token: token, User: *user}, nil
+	return &AuthResponse{Token: token, User: user}, nil
+}
+
+func (s *Service) GetUserByID(id string) (*User, error) {
+	var user User
+	err := db.DB.QueryRow(
+		"SELECT id, username, email, password_hash, win_count, balance FROM users WHERE id = ?",
+		id,
+	).Scan(&user.ID, &user.Username, &user.Email, &user.PasswordHash, &user.WinCount, &user.Balance)
+
+	if err == sql.ErrNoRows {
+		return nil, ErrUserNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &user, nil
 }
 
 // ResetPassword generates a reset token (email delivery not implemented).
 func (s *Service) ResetPassword(req ResetPasswordRequest) (*ResetPasswordResponse, error) {
-	s.mu.RLock()
-	_, exists := s.byEmail[req.Email]
-	s.mu.RUnlock()
-
-	if !exists {
+	// 1. Check if user exists
+	var id string
+	err := db.DB.QueryRow("SELECT id FROM users WHERE email = ?", req.Email).Scan(&id)
+	if err == sql.ErrNoRows {
 		return nil, ErrUserNotFound
+	}
+	if err != nil {
+		return nil, err
 	}
 
 	resetToken := uuid.NewString()
@@ -100,17 +136,6 @@ func (s *Service) ResetPassword(req ResetPasswordRequest) (*ResetPasswordRespons
 		ResetToken: resetToken,
 		Message:    "Use this token to reset your password (email delivery not yet implemented).",
 	}, nil
-}
-
-func (s *Service) GetUserByID(id string) (*User, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	user, exists := s.byID[id]
-	if !exists {
-		return nil, ErrUserNotFound
-	}
-	return user, nil
 }
 
 // --- JWT helpers ---

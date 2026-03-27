@@ -21,6 +21,13 @@ func (h *Handler) RegisterRoutes(rg *gin.RouterGroup) {
 	rg.POST("/register", h.Register)
 	rg.POST("/login", h.Login)
 	rg.POST("/reset-password", h.ResetPassword)
+
+	// Protected routes
+	protected := rg.Group("")
+	protected.Use(Middleware())
+	{
+		protected.GET("/me", h.Me)
+	}
 }
 
 func (h *Handler) Register(c *gin.Context) {
@@ -77,4 +84,14 @@ func (h *Handler) ResetPassword(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, resp)
+}
+
+func (h *Handler) Me(c *gin.Context) {
+	userID := GetUserID(c)
+	user, err := h.svc.GetUserByID(userID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
+		return
+	}
+	c.JSON(http.StatusOK, user)
 }

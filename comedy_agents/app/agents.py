@@ -3,6 +3,7 @@
 import random
 import uuid
 from app.gemini_client import GeminiClient
+from app.database import getAllPrompts
 
 COMEDIC_PERSONALITIES = [
     "dry British sarcasm",
@@ -52,7 +53,20 @@ class ComedyAgent:
 
         User: {user_input}
         """
-        return self.client.generate(prompt)
+        try:
+            if self.client.mock_mode:
+                raise Exception("Mock mode active - using DB failsafe")
+            return self.client.generate(prompt)
+        except Exception:
+            # DB Failsafe logic
+            try:
+                all_prompts = getAllPrompts()
+                if all_prompts:
+                    random_prompt = random.choice(all_prompts)["prompt"]
+                    return f"[{self.personality.upper()} MODE] {random_prompt}"
+            except:
+                pass
+            return self.client.generate(prompt) # Fallback to client mock if DB also fails
 
 
 def create_agents(n: int):

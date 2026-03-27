@@ -2,12 +2,14 @@ package auth
 
 import "github.com/golang-jwt/jwt/v5"
 
-// User represents an authenticated user in memory.
+// User represents an authenticated user.
 type User struct {
 	ID           string `json:"id"`
 	Username     string `json:"username"`
 	Email        string `json:"email"`
 	PasswordHash string `json:"-"`
+	WinCount     int    `json:"win_count"`
+	Balance      int    `json:"balance"`
 }
 
 // Claims are the JWT payload fields.

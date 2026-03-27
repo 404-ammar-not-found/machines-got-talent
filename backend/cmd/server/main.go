@@ -8,12 +8,16 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/machines-got-talent/backend/internal/ai"
 	"github.com/machines-got-talent/backend/internal/auth"
+	"github.com/machines-got-talent/backend/internal/db"
 	"github.com/machines-got-talent/backend/internal/game"
 	"github.com/machines-got-talent/backend/internal/lobby"
 	"github.com/machines-got-talent/backend/pkg/config"
 )
 
 func main() {
+	// Initialize database
+	db.InitDB()
+
 	// --- Dependency wiring ---
 	authSvc := auth.NewService()
 	authHandler := auth.NewHandler(authSvc)

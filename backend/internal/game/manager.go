@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"github.com/machines-got-talent/backend/internal/ai"
+	"github.com/machines-got-talent/backend/internal/db"
 	"github.com/machines-got-talent/backend/internal/lobby"
 )
 
@@ -344,6 +345,20 @@ func (m *Manager) endRound() {
 			if p.ClaimedAI == winnerAI {
 				winnerPlayer = id
 				break
+			}
+		}
+
+		// PERSIST TO DATABASE
+		for playerID, delta := range deltas {
+			_, err := db.DB.Exec("UPDATE users SET balance = balance + ? WHERE id = ?", delta, playerID)
+			if err != nil {
+				log.Printf("Failed to update balance for user %s: %v", playerID, err)
+			}
+		}
+		if winnerPlayer != "" {
+			_, err := db.DB.Exec("UPDATE users SET win_count = win_count + 1 WHERE id = ?", winnerPlayer)
+			if err != nil {
+				log.Printf("Failed to update win_count for user %s: %v", winnerPlayer, err)
 			}
 		}
 	}
